@@ -1,17 +1,16 @@
-# VoApps DirectDrop Voicemail — Direct Integration Kit
+# VoApps DirectDrop Voicemail: Direct Integration Kit
 
 Drop DirectDrop Voicemail (DDVM) into your own application and skip Zapier's
 per-task costs at volume. This kit packages the exact logic the VoApps Zapier
-integration uses — find-or-create transactional campaigns, the consistent
-campaign naming, bulk CSV import, per-record sends, and postback (webhook)
-signature verification — as a dependency-free reference you can port to any
-stack.
+integration uses, as a dependency-free reference you can port to any stack:
+find-or-create transactional campaigns, the consistent campaign naming, bulk CSV
+import, per-record sends, and postback (webhook) signature verification.
 
 **When to use this instead of Zapier:** Zapier bills one task per action step, so
-~50k records/month in a per-record Zap runs roughly $350–600/month in Zapier fees.
+~50k records/month in a per-record Zap runs roughly $350-600/month in Zapier fees.
 A direct integration (or Zapier's own daily-batch pattern) collapses that to a
-handful of calls. Above ~10k–20k sends/month, integrate directly. (This is only
-about Zapier's task fees and integration overhead — your VoApps cost is per
+handful of calls. Above ~10k-20k sends/month, integrate directly. (This is only
+about Zapier's task fees and integration overhead. Your VoApps cost is per
 voicemail delivered and is the same no matter how you send.)
 
 ## Files
@@ -61,7 +60,7 @@ day's campaign if one does not exist yet. The campaign is named
 ### 2. Daily batch (one call for the whole day)
 Create one transactional campaign seeded with the whole day's records in a single
 call. This is the direct-integration equivalent of the daily-batch Zap. It costs
-the **same** at VoApps as sending per-record — VoApps bills per voicemail either
+the **same** at VoApps as sending per-record; VoApps bills per voicemail either
 way. The advantages are operational: one API call instead of thousands, one
 campaign to manage per day, and no rate-limit pressure.
 
@@ -137,8 +136,8 @@ curl "https://directdropvoicemail.voapps.com/api/v1/accounts/ACCOUNT_ID/campaign
   -H "Authorization: Token token=YOUR_API_KEY"
 # -> { "campaign": { "status": "...", "export": "<S3 CSV url>", "records_count": N, ... } }
 ```
-Download the `export` URL with a plain GET (no auth header — it is a presigned S3
-link; adding the token header breaks it).
+Download the `export` URL with a plain GET (no auth header: it is a presigned S3
+link, and adding the token header breaks it).
 
 ## Delivery results (postbacks)
 
@@ -147,7 +146,7 @@ POSTs each record's **final** result to it. Postbacks fire only on final codes,
 never while pending/running. Respond `200` within ~5 seconds or VoApps retries.
 
 **Result codes:** `100` pending · `101` running · `200` delivered · `300`
-expired · `301` canceled · `400`–`410` failed/invalid · `500`–`504` restricted.
+expired · `301` canceled · `400`-`410` failed/invalid · `500`-`504` restricted.
 
 **Optional signature verification (HMAC).** If your org enables signing, VoApps
 sends:
@@ -171,7 +170,7 @@ and the `module.exports = { … }` block with `export { … }`.
 
 ## Notes
 
-- This is a reference implementation — test it against your VoApps account before
+- This is a reference implementation; test it against your VoApps account before
   production. The network calls mirror the VoApps Zapier integration exactly.
 - For interactive API exploration, use the VoApps Postman collection linked in the
   VoApps Knowledge Base.
@@ -180,4 +179,4 @@ and the `module.exports = { … }` block with `export { … }`.
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Use it, modify it, ship it.
+MIT. See [LICENSE](LICENSE). Use it, modify it, ship it.
