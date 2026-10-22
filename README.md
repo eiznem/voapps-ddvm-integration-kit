@@ -13,6 +13,9 @@ handful of calls. Above ~10k-20k sends/month, integrate directly. (This is only
 about Zapier's task fees and integration overhead. Your VoApps cost is per
 voicemail delivered and is the same no matter how you send.)
 
+Prefer no-code? A Zapier integration is also available, private and by invite.
+Contact VoApps for access.
+
 ## Files
 
 | File | What it is |
@@ -172,8 +175,9 @@ and the `module.exports = { … }` block with `export { … }`.
 
 - This is a reference implementation; test it against your VoApps account before
   production. The network calls mirror the VoApps Zapier integration exactly.
-- For interactive API exploration, use the VoApps Postman collection linked in the
-  VoApps Knowledge Base.
+- For the full API reference, result codes, and the Postman collection, open the
+  VoApps Knowledge Base: log in to your DirectDrop Voicemail portal and click
+  **Help Center** in the left nav.
 - Timezone defaults to `America/Los_Angeles`; pass `timezone` to `createClient` to
   match your business hours. Keep it consistent with however you schedule sends.
 
