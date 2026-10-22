@@ -8,9 +8,11 @@ signature verification — as a dependency-free reference you can port to any
 stack.
 
 **When to use this instead of Zapier:** Zapier bills one task per action step, so
-~50k records/month in a per-record Zap runs roughly $350–600/month. A direct
-integration (or Zapier's own daily-batch pattern) collapses that to a handful of
-calls. Above ~10k–20k sends/month, integrate directly.
+~50k records/month in a per-record Zap runs roughly $350–600/month in Zapier fees.
+A direct integration (or Zapier's own daily-batch pattern) collapses that to a
+handful of calls. Above ~10k–20k sends/month, integrate directly. (This is only
+about Zapier's task fees and integration overhead — your VoApps cost is per
+voicemail delivered and is the same no matter how you send.)
 
 ## Files
 
@@ -33,7 +35,8 @@ calls. Above ~10k–20k sends/month, integrate directly.
 
 ### 1. Per-record (event-driven)
 Find-or-create today's transactional campaign, then add one record. Best when your
-app sends on an event and volume is modest.
+app sends as events happen (a new record, a status change) and wants each one out
+the door right away.
 
 ```js
 const { createClient } = require('./voapps');
@@ -55,9 +58,12 @@ day's campaign if one does not exist yet. The campaign is named
 `"<label> | Transactional Campaign | <ISO 8601 w/ offset>"`, e.g.
 `45+ DPD | Transactional Campaign | 2026-10-21T19:35:48.705-07:00`.
 
-### 2. Daily batch (cheapest at volume)
+### 2. Daily batch (one call for the whole day)
 Create one transactional campaign seeded with the whole day's records in a single
-call. This is the direct-integration equivalent of the daily-batch Zap.
+call. This is the direct-integration equivalent of the daily-batch Zap. It costs
+the **same** at VoApps as sending per-record — VoApps bills per voicemail either
+way. The advantages are operational: one API call instead of thousands, one
+campaign to manage per day, and no rate-limit pressure.
 
 ```js
 const records = [
