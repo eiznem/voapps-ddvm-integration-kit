@@ -16,12 +16,12 @@ voicemail delivered and is the same no matter how you send.)
 Prefer no-code? A Zapier integration is also available, private and by invite.
 Contact VoApps for access.
 
-## No-code setup guides
+## Setup guides
 
-Connect your CRM or marketing platform without writing code:
+Connect your CRM or marketing platform:
 
-- [HubSpot](docs/zapier-hubspot.md): via the VoApps Zapier integration (private, by invite: email support@voapps.com).
-- [Iterable](docs/iterable.md): native, using Iterable's own journey webhooks to call VoApps directly (no Zapier).
+- **HubSpot:** [via Zapier](docs/zapier-hubspot.md) (no code; private Zapier integration, by invite: support@voapps.com), or [native via HubSpot Workflows](docs/hubspot-native.md) (Operations Hub Pro+, a custom-code workflow action, no Zapier).
+- **Iterable:** [native via journey webhooks](docs/iterable.md) (no code, no Zapier).
 
 Everything below is the developer path (direct API).
 

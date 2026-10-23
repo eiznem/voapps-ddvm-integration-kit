@@ -133,6 +133,6 @@ failed/invalid, `500`-`504` restricted. Results fire only on final outcomes.
   non-`2xx` makes the user exit the journey at that step, so confirm your test
   returns `2xx`.
 - The account-level `/records` endpoint adds the record to that day's transactional
-  campaign automatically; the campaign uses VoApps's default naming. If a send ever
-  returns an error about no campaign, contact **support@voapps.com**.
+  campaign automatically (VoApps creates it if needed); the campaign uses VoApps's
+  default naming.
 - Your VoApps cost is per voicemail delivered, the same however you send.
