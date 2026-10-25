@@ -49,7 +49,9 @@ which is not Basic or OAuth):
 
 ### Body
 
-Set the body format to **URL-encoded** and add a single field:
+Set the body format to **URL-encoded** and add a single field. (VoApps expects the
+record as one `record_attributes` value in a form body, so use **URL-encoded** here,
+**not JSON** — the Call Webhook tile still sends a POST in this mode.)
 
 - **Name:** `record_attributes`
 - **Value:**
@@ -81,10 +83,21 @@ Use a phone number you can check (your own). Click **Run Test**. VoApps should
 return a `2xx` with a record id. Iterable will not let you save until a test
 passes, which is a good guard against typos. Save the webhook.
 
+**Tip — see exactly what Iterable sends.** Before (or instead of) testing against
+VoApps, set the **Endpoint** to a free [webhook.site](https://webhook.site) URL and
+click **Run Test**. webhook.site captures the full request, so you can confirm your
+merge tags resolved to real values — a real phone number in `number`, your `zip`, your
+tie-back id — and that the `Authorization` header is present and correctly formatted.
+Once it looks right, switch the **Endpoint** back to the VoApps records URL and run the
+test again.
+
 ## Step 2: Add it to your journey
 
 In the journey, at the point where a user should receive a voicemail, add a
-**Call Webhook** tile and select the `VoApps DirectDrop Voicemail` webhook.
+**Call Webhook** tile and select the `VoApps DirectDrop Voicemail` webhook. Use the
+**Call Webhook** action specifically — not *Update User Profile Webhook* (an inbound
+GET that pulls data into Iterable) or system/channel webhooks (which fire from message
+sends).
 
 If you expect high volume, set a **rate limit** on the tile so VoApps receives a
 steady pace rather than a burst. There is no per-call fee from Zapier here, so you
