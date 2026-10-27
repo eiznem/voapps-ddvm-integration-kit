@@ -1,0 +1,381 @@
+openapi: 3.1.0
+info:
+  title: VoApps DirectDrop Voicemail API
+  version: "1.0.0-draft"
+  summary: Send ringless (DirectDrop) voicemail and retrieve delivery results.
+  description: |
+    Machine-readable spec for the VoApps **DirectDrop Voicemail (DDVM)** API.
+
+    > **Draft — verify before relying on it.** This spec was authored from the public
+    > Knowledge Base (API Access Guide) and the Postman collection. Engineering should
+    > confirm every path, field, and response against the live API before publishing it
+    > as authoritative.
+
+    Core concepts:
+    - **Transactional campaigns are per-day** and expire at the end of the day (VoApps cuts
+      days at midnight UTC-07:00). Create/find one transactional campaign for the current day,
+      add that day's records to it, then start a fresh one the next day.
+    - **Campaign names must be unique per account** — reusing one returns `400 Name must be
+      unique for this account`. Append an ISO-8601 timestamp.
+    - The **HTTP status of a call is separate from the voicemail delivery result**; results
+      come back on each record (and via the postback webhook) as a `delivery_status` + code.
+  contact:
+    name: VoApps Support
+    email: support@voapps.com
+servers:
+  - url: https://directdropvoicemail.voapps.com/api/v1
+    description: Production
+security:
+  - ApiKeyAuth: []
+tags:
+  - name: Accounts
+  - name: Messages
+  - name: Caller Numbers
+  - name: Campaigns
+  - name: Records
+  - name: Partner API
+paths:
+  /accounts:
+    get:
+      tags: [Accounts]
+      summary: List accounts
+      operationId: listAccounts
+      responses:
+        "200":
+          description: Accounts the API key can access.
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Account" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [Accounts]
+      summary: Create an account
+      operationId: createAccount
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema: { $ref: "#/components/schemas/AccountCreate" }
+      responses:
+        "201": { description: Created., content: { application/json: { schema: { $ref: "#/components/schemas/Account" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /accounts/{account_id}/messages:
+    parameters: [ { $ref: "#/components/parameters/AccountId" } ]
+    get:
+      tags: [Messages]
+      summary: List messages
+      operationId: listMessages
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Message" } } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [Messages]
+      summary: Create a message
+      operationId: createMessage
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema: { $ref: "#/components/schemas/MessageCreate" }
+      responses:
+        "201": { description: Created., content: { application/json: { schema: { $ref: "#/components/schemas/Message" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /accounts/{account_id}/messages/{message_id}:
+    parameters: [ { $ref: "#/components/parameters/AccountId" }, { $ref: "#/components/parameters/MessageId" } ]
+    get:
+      tags: [Messages]
+      summary: Message information
+      operationId: getMessage
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Message" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /accounts/{account_id}/caller_numbers:
+    parameters: [ { $ref: "#/components/parameters/AccountId" } ]
+    get:
+      tags: [Caller Numbers]
+      summary: List caller numbers
+      operationId: listCallerNumbers
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/CallerNumber" } } } } }
+    post:
+      tags: [Caller Numbers]
+      summary: Create a caller number
+      operationId: createCallerNumber
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema: { $ref: "#/components/schemas/CallerNumberCreate" }
+      responses:
+        "201": { description: Created., content: { application/json: { schema: { $ref: "#/components/schemas/CallerNumber" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /accounts/{account_id}/caller_numbers/{caller_number_id}:
+    parameters: [ { $ref: "#/components/parameters/AccountId" }, { name: caller_number_id, in: path, required: true, schema: { type: string } } ]
+    get:
+      tags: [Caller Numbers]
+      summary: Caller number information
+      operationId: getCallerNumber
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/CallerNumber" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /accounts/{account_id}/campaigns:
+    parameters: [ { $ref: "#/components/parameters/AccountId" } ]
+    get:
+      tags: [Campaigns]
+      summary: List campaigns
+      description: Filter by a single `created_date` (YYYY-MM-DD, UTC) or a `created_date_start`/`created_date_end` range.
+      operationId: listCampaigns
+      parameters:
+        - { name: created_date, in: query, schema: { type: string, format: date } }
+        - { name: created_date_start, in: query, schema: { type: string, format: date } }
+        - { name: created_date_end, in: query, schema: { type: string, format: date } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Campaign" } } } } }
+    post:
+      tags: [Campaigns]
+      summary: Create a campaign (transactional)
+      description: |
+        Create a transactional campaign for the current day. **Create once, then add records** to it;
+        the campaign expires at the end of the day. Names must be unique per account.
+      operationId: createCampaign
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema: { $ref: "#/components/schemas/CampaignCreate" }
+      responses:
+        "201": { description: Created., content: { application/json: { schema: { $ref: "#/components/schemas/Campaign" } } } }
+        "400":
+          description: Validation error (e.g. `Name must be unique for this account`).
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+  /accounts/{account_id}/campaigns/{campaign_id}:
+    parameters: [ { $ref: "#/components/parameters/AccountId" }, { $ref: "#/components/parameters/CampaignId" } ]
+    get:
+      tags: [Campaigns]
+      summary: Campaign information
+      operationId: getCampaign
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Campaign" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Campaigns]
+      summary: Update a campaign (pause / unpause / cancel / change pace)
+      operationId: updateCampaign
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema: { $ref: "#/components/schemas/CampaignUpdate" }
+      responses:
+        "200": { description: Updated., content: { application/json: { schema: { $ref: "#/components/schemas/Campaign" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /accounts/{account_id}/campaigns/{campaign_id}/records:
+    parameters: [ { $ref: "#/components/parameters/AccountId" }, { $ref: "#/components/parameters/CampaignId" } ]
+    post:
+      tags: [Records]
+      summary: Create a record
+      description: Add a recipient record to a campaign. The body is form-urlencoded with a single `record_attributes` field containing a JSON object (see RecordAttributes).
+      operationId: createRecord
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema: { $ref: "#/components/schemas/RecordCreate" }
+      responses:
+        "201": { description: Created., content: { application/json: { schema: { $ref: "#/components/schemas/Record" } } } }
+        "400":
+          description: Validation error. A duplicate recipient returns `402` with a `duplicate_hash`.
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+        "402":
+          description: Duplicate recipient (already in this campaign). The response carries a `duplicate_hash`.
+          content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+  /accounts/{account_id}/campaigns/{campaign_id}/records/{record_id}:
+    parameters: [ { $ref: "#/components/parameters/AccountId" }, { $ref: "#/components/parameters/CampaignId" }, { name: record_id, in: path, required: true, schema: { type: string } } ]
+    get:
+      tags: [Records]
+      summary: Record information (incl. delivery result)
+      operationId: getRecord
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Record" } } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /accounts/{account_id}/records:
+    parameters: [ { $ref: "#/components/parameters/AccountId" } ]
+    post:
+      tags: [Records]
+      summary: Create a record (convenience — auto transactional campaign)
+      description: Adds a record without naming a campaign; VoApps finds or creates the current day's transactional campaign for it.
+      operationId: createRecordConvenience
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema: { $ref: "#/components/schemas/RecordCreate" }
+      responses:
+        "201": { description: Created., content: { application/json: { schema: { $ref: "#/components/schemas/Record" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /partners/users:
+    get:
+      tags: [Partner API]
+      summary: List partner users
+      description: Partner API keys only — lists the managed users/accounts under the partner.
+      operationId: listPartnerUsers
+      responses:
+        "200": { description: OK }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+webhooks:
+  deliveryResult:
+    post:
+      summary: Delivery result postback
+      description: |
+        When a record finishes, VoApps POSTs the result to the record's `voapps_postback_url`.
+        **Verify the HMAC signature** before trusting the payload.
+
+        Each postback carries:
+        - `X-VoApps-Timestamp` — unix seconds when the postback was signed.
+        - `X-VoApps-Destination` — the postback URL VoApps posted to.
+        - `X-VoApps-Signature` — `v1=` + HMAC-SHA256 (hex), keyed with your account signing secret,
+          over the string `timestamp.destination.raw_body` (the three joined by literal dots, using the
+          exact raw request body).
+
+        VoApps retries delivery of a postback up to 3 times (immediate, +30s, +60s). Endpoints must be
+        HTTPS with a valid certificate; plain http, private/internal hosts, and redirects are skipped.
+      parameters:
+        - { name: X-VoApps-Timestamp, in: header, required: true, schema: { type: string } }
+        - { name: X-VoApps-Destination, in: header, required: true, schema: { type: string } }
+        - { name: X-VoApps-Signature, in: header, required: true, schema: { type: string }, example: "v1=3f9a...hex" }
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PostbackPayload" }
+      responses:
+        "200": { description: Return 2xx promptly to acknowledge receipt. }
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: 'Send your API key as `Authorization: Token token=YOUR_API_KEY`. Partners use their partner API key.'
+  parameters:
+    AccountId: { name: account_id, in: path, required: true, schema: { type: string }, description: VoApps account id. }
+    MessageId: { name: message_id, in: path, required: true, schema: { type: string } }
+    CampaignId: { name: campaign_id, in: path, required: true, schema: { type: string } }
+  responses:
+    Unauthorized:
+      description: Missing or invalid API key.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    NotFound:
+      description: Resource not found.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    BadRequest:
+      description: Client error — the request was rejected and nothing was created. Do not retry; fix the request.
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+  schemas:
+    Account:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        timezone: { type: string, example: America/New_York }
+    AccountCreate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        timezone: { type: string, example: America/New_York }
+    Message:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+    MessageCreate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        description: { type: string }
+    CallerNumber:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        number: { type: string, example: "+15555551010" }
+    CallerNumberCreate:
+      type: object
+      required: [number]
+      properties:
+        number: { type: string }
+        name: { type: string }
+    Campaign:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        pace: { type: integer, description: Delivery pace. }
+        created_date: { type: string, format: date }
+        status: { type: string }
+    CampaignCreate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, description: Unique per account; append an ISO-8601 timestamp. }
+        message_id: { type: string }
+        caller_number: { type: string }
+        target_date: { type: string, description: Optional per-campaign default target date. }
+        pace: { type: integer }
+    CampaignUpdate:
+      type: object
+      properties:
+        method: { type: string, enum: [pause, unpause, cancel], description: Pause/unpause/cancel the campaign. }
+        pace: { type: integer, description: New delivery pace. }
+    RecordCreate:
+      type: object
+      required: [record_attributes]
+      properties:
+        record_attributes:
+          type: string
+          description: A JSON object (as a string) describing the recipient — see RecordAttributes.
+          example: '{"number":"5555551010","voapps_zip_code":"90210","voapps_postback_url":"https://example.com/postback"}'
+    RecordAttributes:
+      type: object
+      description: The JSON carried in `record_attributes`.
+      properties:
+        number: { type: string, description: Recipient phone (or use `phone_number`). }
+        phone_number: { type: string, description: Alias of `number`. }
+        voapps_zip_code: { type: string }
+        voapps_voice_append: { type: string, description: Text-to-speech appended to the message. }
+        voapps_postback_url: { type: string, format: uri, description: Where VoApps POSTs the result. }
+        target_date: { type: string, description: When to deliver (ISO-8601). }
+        message_id: { type: string, description: Per-record message override. }
+        caller_number: { type: string, description: Per-record caller-number override. }
+    Record:
+      type: object
+      properties:
+        id: { type: string }
+        number: { type: string, description: Returned in +1 format. }
+        original_fields: { type: object, additionalProperties: true, description: Echoes exactly what you sent. }
+        delivery_status: { type: string, example: Successful delivery }
+        delivery_status_code: { type: integer, example: 200, description: Voicemail result code (separate from HTTP status). }
+        duplicate: { type: boolean }
+        duplicate_hash: { type: string, description: Present when the record is a duplicate. }
+        voapps_timestamp: { type: string }
+    PostbackPayload:
+      type: object
+      properties:
+        record:
+          type: object
+          properties:
+            id: { type: integer }
+            number: { type: string }
+            original_fields: { type: object, additionalProperties: true }
+            delivery_status: { type: string, example: Successful delivery }
+            delivery_status_code: { type: integer, example: 200 }
+            campaign_name: { type: string }
+            voapps_timestamp: { type: string }
+    Error:
+      type: object
+      properties:
+        error: { type: string, example: Name must be unique for this account }
+        duplicate_hash: { type: string, description: Present on a 402 duplicate-record response. }
