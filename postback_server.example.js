@@ -32,6 +32,8 @@ app.post('/voapps/postback', (req, res) => {
     const ok = verifyPostbackSignature({
       signingSecret: SIGNING_SECRET,
       timestamp: req.get('X-VoApps-Timestamp'),
+      // X-VoApps-Destination is the postback URL this was sent to (NOT a phone number).
+      // Pass the header value through verbatim - it is part of the signed string.
       destination: req.get('X-VoApps-Destination'),
       rawBody,
       signatureHeader: req.get('X-VoApps-Signature'),
@@ -51,8 +53,9 @@ app.post('/voapps/postback', (req, res) => {
   //   record.account_number        -> your tie-back reference (what you sent)
   //   record.phone_number / number -> the destination
   //   record.delivery_status       -> human-readable status
-  //   record.delivery_status_code  -> 200 delivered, 300 expired, 301 canceled,
-  //                                   400-410 failed/invalid, 500-504 restricted
+  //   record.delivery_status_code  -> delivery result (NOT an HTTP code): 100/101 non-final
+  //                                   (pending/running), 200 delivered, 300 expired, 301 canceled,
+  //                                   400-410 failed/invalid (402 = duplicate), 500-504 restricted
   //   record.voapps_timestamp      -> when the result was produced
   console.log('VoApps result',
     record.account_number, record.delivery_status, record.delivery_status_code);

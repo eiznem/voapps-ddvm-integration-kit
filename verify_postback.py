@@ -5,10 +5,12 @@ VoApps signs `{timestamp}.{destination}.{raw_body}` with HMAC-SHA256 and your or
 signing secret, and sends these headers with each postback:
     X-VoApps-Signature:   v1=<hex>
     X-VoApps-Timestamp:   <unix seconds>
-    X-VoApps-Destination: <destination phone number>
+    X-VoApps-Destination: <the postback URL it was sent to, as given in the record>
 
-Pass the EXACT raw request body you received (bytes or str) as raw_body - do not
-re-serialize a parsed object, or the bytes (and the signature) will not match.
+Pass the X-VoApps-Destination header value through verbatim as `destination` (it is
+the postback URL, not a phone number, and is part of the signed string). Pass the EXACT
+raw request body you received (bytes or str) as raw_body - do not re-serialize a parsed
+object, or the bytes (and the signature) will not match.
 
 No third-party dependencies; standard library only.
 """

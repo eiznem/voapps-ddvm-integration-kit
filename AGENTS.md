@@ -25,8 +25,16 @@ Orientation for an AI coding assistant building a **VoApps DirectDrop Voicemail 
 - **Result codes** describe the *voicemail outcome* (e.g. `200` delivered, `401` not a wireless number, `500` restricted) and are distinct from HTTP status.
 - VoApps **cuts days at midnight UTC-07:00**; pull completed-day results after that cutoff so the day is final.
 
+## Record fields & data contract
+- Per-record fields in `record_attributes` (a JSON **string**) use the **`voapps_` prefix**: `voapps_message_id`, `voapps_caller_number`, `voapps_target_date`, `voapps_zip_code`, `voapps_voice_append`, `voapps_postback_url`. `voapps_caller_number` is the **phone number**, not a caller-number id. Put your own tie-back id in any non-`voapps_` key (e.g. `account_number`); it is echoed back under `original_fields`.
+- Create endpoints (account, message, caller number, campaign) are **`multipart/form-data`**; record create and campaign update are **`application/x-www-form-urlencoded`**.
+- Responses are JSON with a named wrapper — `{ "campaign": { ... } }`, `{ "campaigns": [ ... ] }`, `{ "record": { ... } }` — not bare objects/arrays. HTTP `400` (`{"error":"..."}`) is the validation error; there is **no HTTP `402`** (402 is a *delivery result* code, "Duplicate number").
+- Postback headers (when org signing is enabled): `X-VoApps-Destination` is the **postback URL** it was sent to (not a phone number); the signature is `v1=` + HMAC-SHA256 over `timestamp.destination.raw_body` using the exact raw body.
+- **Do not invent fields, headers, endpoints, or callbacks.** The machine-readable contract is [`openapi.yaml`](openapi.yaml); what is verified vs. still assumed is tracked in [`docs/API_CONTRACT_AUDIT.md`](docs/API_CONTRACT_AUDIT.md). If something isn't in those, confirm against the Knowledge Base before using it.
+
 ## Resources
 - **Knowledge Base** — API Access Guide, API Integration Outline, *Errors & Status Codes*, *Error Handling & Campaign Names*.
+- **Machine-readable spec** — [`openapi.yaml`](openapi.yaml) (OpenAPI 3.1) and the contract audit [`docs/API_CONTRACT_AUDIT.md`](docs/API_CONTRACT_AUDIT.md).
 - **Integration Kit** (reference module, HTTP/curl recipes, postback-signature verification in Node & Python): <https://github.com/eiznem/voapps-ddvm-integration-kit>
 - **Postman collection** (worked examples + assertions, built from the API Access Guide): <https://github.com/eiznem/voapps-api-postman-collection>
 
