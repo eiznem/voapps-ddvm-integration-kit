@@ -1,0 +1,14 @@
+{
+  "name": "voapps-ddvm-integration-kit",
+  "version": "1.0.0-draft",
+  "description": "No-Zapier reference implementation for integrating VoApps DirectDrop Voicemail (DDVM).",
+  "license": "MIT",
+  "type": "commonjs",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "test": "node --test",
+    "lint:openapi": "npx --yes @redocly/cli@1 lint openapi.yaml",
+    "check": "npm run lint:openapi && npm test"
+  },
+  "repository": { "type": "git", "url": "https://github.com/eiznem/voapps-ddvm-integration-kit.git" }
+}

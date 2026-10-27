@@ -138,9 +138,11 @@ curl -G "https://directdropvoicemail.voapps.com/api/v1/accounts/ACCOUNT_ID/campa
   --data-urlencode "created_date=2026-10-21 00:00:00 -07:00"
 # -> { "campaigns": [ { "id": ..., "status": "running", "target_date": "..." }, ... ] }
 ```
-Reuse a campaign whose status is one of `setup, importing, pending, running,
-paused`; if several qualify, pick the one whose `target_date` is closest to now;
-if none, create a new one.
+Reuse a campaign **for the same label** whose status is one of `setup, importing,
+pending, running, paused`; if several qualify, pick the one whose `target_date` is
+closest to now; if none, create a new one. The kit also sends each record with its
+`voapps_message_id` / `voapps_caller_number` as per-record overrides, so a reused
+campaign still delivers the intended message and caller number.
 
 **Get a campaign's status / results export**
 ```bash
@@ -165,8 +167,10 @@ sends:
 ```
 X-VoApps-Signature:   v1=<hex>
 X-VoApps-Timestamp:   <unix seconds>
-X-VoApps-Destination: <destination phone number>
+X-VoApps-Destination: <the postback URL it was sent to, as given in the record>
 ```
+`X-VoApps-Destination` is the postback **URL** the result was delivered to (not a phone
+number); it is part of the signed string, so pass the header value through verbatim.
 The signature is `HMAC-SHA256(signing_secret, "<timestamp>.<destination>.<raw_body>")`.
 Verify using the **exact raw body** (not a re-serialized object), check the
 timestamp is fresh (≤ 300s), and compare in constant time. See
@@ -187,8 +191,10 @@ and the `module.exports = { … }` block with `export { … }`.
 - For the full API reference, result codes, and the Postman collection, open the
   VoApps Knowledge Base: log in to your DirectDrop Voicemail portal and click
   **Help Center** in the left nav.
-- Timezone defaults to `America/Los_Angeles`; pass `timezone` to `createClient` to
-  match your business hours. Keep it consistent with however you schedule sends.
+- Timezone defaults to `America/Los_Angeles` for campaign-name timestamps; pass
+  `timezone` to `createClient` to match your business hours. Note the *day boundary*
+  used to find today's transactional campaign is anchored to VoApps's fixed
+  **UTC-07:00** daily cutoff (year-round, no DST), independent of this `timezone`.
 
 ## License
 
