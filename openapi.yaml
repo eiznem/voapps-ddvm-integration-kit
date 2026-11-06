@@ -1,22 +1,22 @@
 openapi: 3.1.0
 info:
   title: VoApps DirectDrop Voicemail API
-  version: "1.0.0-draft"
+  version: "1.0.0"
   summary: Send ringless (DirectDrop) voicemail and retrieve delivery results.
   description: |
     Machine-readable spec for the VoApps **DirectDrop Voicemail (DDVM)** API.
 
-    > **Draft — verify before relying on it.** Authored from the public Knowledge Base
-    > (API Access Guide, *Errors & Status Codes*, *Result Codes Defined*) and the Postman
-    > collection, and cross-checked against the reference kit. Items still pending live /
-    > Engineering confirmation are listed in `docs/API_CONTRACT_AUDIT.md`.
+    > Authored from the public Knowledge Base (API Access Guide, *Errors & Status Codes*,
+    > *Result Codes Defined*) and the Postman collection, then confirmed with VoApps on
+    > 2026-11-06. Verification notes are in `docs/API_CONTRACT_AUDIT.md`.
 
     Core concepts:
     - **Responses are JSON objects with a named wrapper**, not bare arrays/objects — e.g.
       `{ "campaigns": [ ... ] }`, `{ "campaign": { ... } }`, `{ "record": { ... } }`,
       and errors as `{ "error": "..." }`.
     - **Transactional campaigns are per-day** and expire at the end of the day. VoApps cuts
-      days at a fixed **UTC-07:00** (year-round, no DST). Create/find one transactional
+      days at a fixed **UTC-07:00** (year-round, no DST), and by default **completes any
+      unfinished campaigns 15 minutes before** that cutoff. Create/find one transactional
       campaign for the current day, add that day's records to it, then start a fresh one the
       next day.
     - **Campaign names must be unique per account** — reusing one returns
@@ -28,7 +28,7 @@ info:
       number"; there is no HTTP `402`).
 
     HTTP status codes (per the KB *Errors & Status Codes* page):
-    - `200` / `201` — success (resource returned or created). In practice the API returns `200`.
+    - `200` — success (resource returned or created). The API returns `200` for creates too — it does **not** use `201`.
     - `400` — `{"error":"..."}`; validation / missing-parameter error. Fix and resubmit; do not
       retry unchanged. Multiple problems are joined into one comma-separated string.
     - `401` — empty body; missing or invalid API key.
@@ -85,7 +85,7 @@ paths:
             schema: { $ref: "#/components/schemas/AccountCreate" }
       responses:
         "200":
-          description: Created (the API returns 200; the KB also documents 201 as success).
+          description: Created (HTTP 200). The new account is returned under the singular `account` key.
           content:
             application/json:
               schema:
@@ -176,7 +176,8 @@ paths:
         Register a caller number (the phone number displayed to recipients). Sent as
         `multipart/form-data`. Caller numbers must be certified by the account owner before use;
         set `verified_by_user` to accept the certification terms. Do not set this flag on the
-        user's behalf without their explicit consent.
+        user's behalf without their explicit consent. A Do-Not-Originate number is **rejected at
+        creation** (returns `400`).
       operationId: createCallerNumber
       requestBody:
         required: true
@@ -218,7 +219,9 @@ paths:
       description: |
         Filter by a single `created_date` **or** a `created_date_start`/`created_date_end` range —
         one of the two is **required**. `created_date` is the date the campaign object was
-        *created*, not when it ran or is scheduled to run. Results are sorted newest first.
+        *created*, not when it ran or is scheduled to run. Results are sorted newest first and
+        **paginated at 25 per page** via `page`; there is **no total-count field**, so keep
+        requesting the next page until one returns fewer than 25 items.
       operationId: listCampaigns
       parameters:
         - name: created_date
@@ -229,7 +232,7 @@ paths:
           schema: { type: string, example: "2026-10-21 00:00:00 -07:00" }
         - { name: created_date_start, in: query, schema: { type: string }, description: Start of a creation-date range (required if `created_date` is omitted). }
         - { name: created_date_end, in: query, schema: { type: string }, description: End of a creation-date range. }
-        - { name: page, in: query, schema: { type: integer, minimum: 1 }, description: Page number (results are paginated). }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 }, description: "1-based page number; 25 results per page. No maximum page — keep paging until a page returns fewer than 25." }
       responses:
         "200":
           description: OK
@@ -325,8 +328,10 @@ paths:
       description: |
         Add a recipient to a campaign. Form-urlencoded with a single `record_attributes` field
         whose value is a JSON **string** (see RecordAttributes). A duplicate recipient is not an
-        HTTP error: the request succeeds and the record is flagged (`duplicate: true` + a
-        `duplicate_hash`) and resolves to delivery result code `402` ("Duplicate number").
+        HTTP error: the request still returns `200` with a new record, but its normalized
+        `number` is empty, a `duplicate_hash` (UUID) is added inside `original_fields`, the record
+        is excluded from delivery, and it resolves to delivery result code `402` ("Duplicate
+        number") in results and postbacks.
       operationId: createRecord
       requestBody:
         required: true
@@ -335,7 +340,7 @@ paths:
             schema: { $ref: "#/components/schemas/RecordCreate" }
       responses:
         "200":
-          description: Record accepted (may be flagged as a duplicate — see `duplicate`/`duplicate_hash`).
+          description: Record accepted (a duplicate still returns 200 — see the duplicate handling above).
           content:
             application/json:
               schema:
@@ -390,10 +395,14 @@ paths:
     get:
       tags: [Partner API]
       summary: List partner users
-      description: Partner API keys only — lists the managed users/accounts under the partner. Response shape not yet verified (see audit).
+      description: Partner API keys only — lists the managed users under the partner, each with its API key. Returns a **bare array** (not wrapped).
       operationId: listPartnerUsers
       responses:
-        "200": { description: OK }
+        "200":
+          description: The managed users under the partner.
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/PartnerUser" } }
         "401": { $ref: "#/components/responses/Unauthorized" }
 webhooks:
   deliveryResult:
@@ -403,7 +412,13 @@ webhooks:
       description: |
         When a record reaches a **final** result, VoApps POSTs the result to the record's
         `voapps_postback_url` (postbacks do not fire while a record is pending/running).
-        Respond with a `2xx` promptly (within ~5s) or VoApps retries up to two more times.
+        Respond with a `2xx` promptly (within ~5s) or VoApps retries up to two more times
+        (at roughly +30s then +60s).
+
+        Endpoints must be HTTPS with a valid certificate; plain `http`, private/internal hosts,
+        and redirecting endpoints are **silently skipped** (no API error is raised). Users with
+        the **Owner** or **Admin** role can review skipped/failed postbacks on the *Failed
+        postbacks* screen in the portal.
 
         **Signing is opt-in per organization.** When your org has enabled a postback signing
         secret, each postback carries:
@@ -547,8 +562,8 @@ components:
         number: { type: string, description: Recipient phone number (or use `phone_number`). }
         phone_number: { type: string, description: Accepted alias of `number`. }
         voapps_zip_code: { type: string, description: Recipient ZIP; improves the delivery window. }
-        voapps_message_id: { type: integer, description: Per-record message override (message id). }
-        voapps_caller_number: { type: string, description: 'Per-record caller-number override — the actual phone number, NOT a caller-number id.' }
+        voapps_message_id: { type: integer, description: "Per-record message override (message id); overrides the campaign's `message_id` default." }
+        voapps_caller_number: { type: string, description: "Per-record caller-number override — the actual phone number, NOT a caller-number id; overrides the campaign's `caller_number` default." }
         voapps_target_date: { type: string, description: Per-record delivery date/time override (ISO-8601). }
         voapps_voice_append: { type: string, description: Text-to-speech appended to the message. }
         voapps_postback_url: { type: string, format: uri, description: Where VoApps POSTs this record's final result. }
@@ -556,12 +571,10 @@ components:
       type: object
       properties:
         id: { type: integer }
-        number: { type: string, description: Recipient number as returned by the API. }
-        original_fields: { type: object, additionalProperties: true, description: Echoes exactly what you sent (including passthrough tie-back fields). }
+        number: { type: string, description: "Recipient number as returned by the API (normalized). Empty on a duplicate record, which is excluded from delivery." }
+        original_fields: { type: object, additionalProperties: true, description: "Echoes exactly what you sent (including passthrough tie-back fields). On a duplicate, VoApps adds a `duplicate_hash` (UUID) here identifying the matched original record." }
         delivery_status: { type: string, example: Successfully delivered }
         delivery_status_code: { $ref: "#/components/schemas/DeliveryResultCode" }
-        duplicate: { type: boolean, description: True when this recipient duplicates one already in the campaign. }
-        duplicate_hash: { type: string, description: Stable hash identifying the duplicate; usable for your own idempotency. }
         voapps_timestamp: { type: string }
     DeliveryResultCode:
       type: integer
@@ -591,6 +604,12 @@ components:
             delivery_status_code: { $ref: "#/components/schemas/DeliveryResultCode" }
             campaign_name: { type: string }
             voapps_timestamp: { type: string }
+    PartnerUser:
+      type: object
+      properties:
+        id: { type: integer, description: "The managed user's id (used to scope that user's requests)." }
+        email: { type: string, format: email }
+        api_key: { type: string, description: "That user's VoApps API key — a credential; store it securely.", example: "EXAMPLE_FAKE_KEY-3392" }
     Error:
       type: object
       properties:

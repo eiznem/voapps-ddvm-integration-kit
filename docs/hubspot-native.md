@@ -63,10 +63,13 @@ Edit the three constants at the top for your account, then paste:
 ```js
 const axios = require('axios');
 
-// Edit these three for your VoApps account:
+// Edit these for your VoApps account:
 const VOAPPS_ACCOUNT_ID = 'YOUR_ACCOUNT_ID';
 const VOAPPS_MESSAGE_ID = 'YOUR_MESSAGE_ID';
 const VOAPPS_CALLER_NUMBER = '+18885551212';
+// Optional: your postback receiver (see "Logging delivery results" below) to close
+// the loop back into HubSpot. Leave '' to skip.
+const VOAPPS_POSTBACK_URL = '';
 
 exports.main = async (event, callback) => {
   const phone = event.inputFields.phone;
@@ -76,7 +79,10 @@ exports.main = async (event, callback) => {
   if (event.inputFields.zip) attrs.voapps_zip_code = event.inputFields.zip;
   attrs.voapps_message_id = VOAPPS_MESSAGE_ID;
   attrs.voapps_caller_number = VOAPPS_CALLER_NUMBER;
+  // Tie-back: send the HubSpot Record ID (hs_object_id) so the result can be matched
+  // back to this exact contact. VoApps echoes it in original_fields on the postback.
   if (event.inputFields.reference) attrs.account_number = event.inputFields.reference;
+  if (VOAPPS_POSTBACK_URL) attrs.voapps_postback_url = VOAPPS_POSTBACK_URL;
 
   const body = new URLSearchParams({ record_attributes: JSON.stringify(attrs) }).toString();
 
@@ -109,28 +115,85 @@ day's transactional campaign in the VoApps portal. Then turn the workflow on.
 ## Field reference
 
 Only **number** is required. Recommended: **zip** (delivery-window safety) and a
-reference id (**account_number**) for tie-back. Supported keys inside
-`record_attributes`: `number`, `voapps_zip_code`, `voapps_message_id`,
-`voapps_caller_number`, `voapps_voice_append`, `voapps_postback_url`,
-`voapps_target_date`, plus passthrough fields such as `account_number`.
+reference id for tie-back. **Use the contact's HubSpot Record ID (`hs_object_id`) as
+that reference** — it is stable and unique, and VoApps echoes it back untouched under
+`original_fields` on the result/postback, so you can match each outcome to the exact
+contact. Send it in any non-`voapps_` key; this guide uses `account_number`.
+
+Supported keys inside `record_attributes`: `number`, `voapps_zip_code`,
+`voapps_message_id`, `voapps_caller_number`, `voapps_voice_append`,
+`voapps_postback_url`, `voapps_target_date`, plus passthrough fields such as
+`account_number`.
 
 Phone format: E.164 (`+15551234567`) or 10-digit US. Do not put PII in
 `voapps_voice_append` (TTS).
 
-## Logging delivery results back into HubSpot
+## Logging delivery results back into HubSpot (close the loop)
 
 The send above is one-directional. To record each voicemail's outcome back on the
-contact, VoApps posts final results (delivered, expired, failed, and so on) to a
-postback URL. Two ways to handle that natively-ish:
+contact, have VoApps **post the final result to a webhook** and write it to the
+contact keyed by the `hs_object_id` you sent as the tie-back. Results fire only on
+final outcomes (delivered, expired, failed, restricted), never while pending.
 
-- **Fire and forget:** review outcomes in the VoApps portal.
-- **Write results back:** stand up a small receiver that accepts the VoApps
-  postback and calls the HubSpot API to log a Call or set a property. The
-  [direct API kit](../README.md) includes a postback receiver (with signature
-  verification) to adapt. This part needs code hosted somewhere.
+### Step A: Create the HubSpot properties to hold the result
+
+On the Contact object, add custom properties, for example:
+
+- `ddvm_delivery_status` (single-line text) — e.g. "Successfully delivered".
+- `ddvm_delivery_code` (number) — the numeric result code.
+- `ddvm_delivered_at` (date) — when the result arrived.
+
+### Step B: Point each record at a postback receiver
+
+Set `VOAPPS_POSTBACK_URL` in the Step 4 code (or set a campaign/account default in
+the VoApps portal). It must be a **public HTTPS URL with a valid certificate** —
+plain `http`, private/internal hosts, and redirects are **silently skipped**, and
+skipped/failed postbacks show up for Owner/Admin users on the VoApps **Failed
+postbacks** screen.
+
+> HubSpot workflow actions can *send* a webhook but cannot *receive* one, so the
+> inbound postback needs a tiny endpoint hosted somewhere (a serverless function on
+> Cloudflare/Lambda/Vercel, a HubSpot CMS serverless function, etc.). The
+> [direct API kit](../README.md) ships a ready `postback_server.example.js` with HMAC
+> signature verification — adapt it as below.
+
+### Step C: In the receiver, verify and update the contact
+
+On each postback the receiver should:
+
+1. **Verify the HMAC signature** (if your org enabled signing) — see the kit's
+   `verify_postback.py` / `postback_server.example.js`.
+2. Read the tie-back and result from the JSON body:
+   `record.original_fields.account_number` (the `hs_object_id` you sent) and
+   `record.delivery_status_code` / `record.delivery_status`.
+3. **PATCH the contact** via the HubSpot CRM API, using that id:
+
+```http
+PATCH https://api.hubapi.com/crm/v3/objects/contacts/{hs_object_id}
+Authorization: Bearer YOUR_HUBSPOT_PRIVATE_APP_TOKEN
+Content-Type: application/json
+
+{
+  "properties": {
+    "ddvm_delivery_status": "Successfully delivered",
+    "ddvm_delivery_code": 200,
+    "ddvm_delivered_at": "2026-11-06"
+  }
+}
+```
+
+(Or log a **Call** engagement instead via `POST /crm/v3/objects/calls` and associate
+it to the contact.)
+
+### Step D (optional): Act on the result with a HubSpot Workflow
+
+Once the outcome lives on the contact, a normal **contact-based workflow** *triggered
+by a change to `ddvm_delivery_status`* can do the follow-up natively — create a task
+on a failed delivery, notify the owner, re-enroll for a retry, or move a deal stage.
+That is where HubSpot Workflows finish closing the loop.
 
 **Result codes:** `200` delivered, `300` expired, `301` canceled, `400`-`410`
-failed/invalid, `500`-`504` restricted. Results fire only on final outcomes.
+failed/invalid, `500`-`504` restricted.
 
 ## Notes
 

@@ -1,6 +1,6 @@
 {
   "name": "voapps-ddvm-integration-kit",
-  "version": "1.0.0-draft",
+  "version": "1.0.0",
   "description": "No-Zapier reference implementation for integrating VoApps DirectDrop Voicemail (DDVM).",
   "license": "MIT",
   "type": "commonjs",
