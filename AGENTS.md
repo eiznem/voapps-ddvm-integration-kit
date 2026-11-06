@@ -23,7 +23,7 @@ Orientation for an AI coding assistant building a **VoApps DirectDrop Voicemail 
 - A successful API response means the request was **accepted** — it is **not** the delivery outcome.
 - Retrieve outcomes two ways: **webhook postback** (include a `voapps_postback_url` on the campaign/record, then verify the HMAC signature on each postback) or **poll** the `records` / `campaigns` endpoints.
 - **Result codes** describe the *voicemail outcome* (e.g. `200` delivered, `401` not a wireless number, `500` restricted) and are distinct from HTTP status.
-- VoApps **cuts days at midnight UTC-07:00**; pull completed-day results after that cutoff so the day is final.
+- VoApps **cuts days at midnight UTC-07:00** (and by default completes any unfinished campaigns ~15 min before the cutoff); pull completed-day results after that cutoff so the day is final.
 
 ## Record fields & data contract
 - Per-record fields in `record_attributes` (a JSON **string**) use the **`voapps_` prefix**: `voapps_message_id`, `voapps_caller_number`, `voapps_target_date`, `voapps_zip_code`, `voapps_voice_append`, `voapps_postback_url`. `voapps_caller_number` is the **phone number**, not a caller-number id. Put your own tie-back id in any non-`voapps_` key (e.g. `account_number`); it is echoed back under `original_fields`.
