@@ -187,14 +187,16 @@ and the `module.exports = { … }` block with `export { … }`.
 ## Notes
 
 - This is a reference implementation; test it against your VoApps account before
-  production. The network calls mirror the VoApps Zapier integration exactly.
+  production. Its calls use the same VoApps DirectDrop Voicemail API (endpoints, auth,
+  parameters) as the Zapier integration.
 - For the full API reference, result codes, and the Postman collection, open the
   VoApps Knowledge Base: log in to your DirectDrop Voicemail portal and click
   **Help Center** in the left nav.
-- Timezone defaults to `America/Los_Angeles` for campaign-name timestamps; pass
-  `timezone` to `createClient` to match your business hours. Note the *day boundary*
-  used to find today's transactional campaign is anchored to VoApps's fixed
-  **UTC-07:00** daily cutoff (year-round, no DST), independent of this `timezone`.
+- Campaign-name timestamps use VoApps's fixed **UTC-07:00** offset by default, so the
+  name's date always matches the VoApps day. The *day boundary* used to find today's
+  transactional campaign uses that same fixed UTC-07:00 cutoff (year-round, no DST).
+  Pass `timezone` to `createClient` only if you want the name stamped in a different
+  zone — it has no effect on the day boundary or on delivery.
 
 ## License
 
