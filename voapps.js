@@ -33,17 +33,22 @@
 const crypto = require('node:crypto');
 
 const DEFAULT_BASE = 'https://directdropvoicemail.voapps.com/api/v1';
-const DEFAULT_TZ = 'America/Los_Angeles';
 // VoApps cuts days at a FIXED UTC-07:00 year-round (no DST) - per the Knowledge Base.
 // The created_date filter that finds "today's" transactional campaign must line up with
-// that cutoff, so the day boundary is anchored to UTC-07:00, not a DST-aware zone.
+// that cutoff, so the day boundary is anchored to UTC-07:00, not a DST-aware zone. The
+// campaign-name timestamp uses this same fixed offset by default (see DEFAULT_TZ), so a
+// name's date never drifts from the VoApps day.
 const VOAPPS_DAY_TZ = 'Etc/GMT+7'; // IANA sign is inverted: Etc/GMT+7 == UTC-07:00, fixed.
 const VOAPPS_DAY_OFFSET = '-07:00';
+// Default timezone for the campaign-name timestamp: VoApps's fixed UTC-07:00 day offset,
+// not a DST-aware zone, so the name's date always matches the VoApps day. Override per
+// client with createClient({ timezone }) only if you want the name stamped in a local zone.
+const DEFAULT_TZ = VOAPPS_DAY_TZ;
 const DEFAULT_TIMEOUT_MS = 30000;
 // Campaign statuses that can still accept records today.
 const USABLE_STATUSES = ['setup', 'importing', 'pending', 'running', 'paused'];
 
-// ---------- naming helpers (match the Zapier action byte-for-byte) ----------
+// ---------- campaign naming helpers (unique, day-scoped names) ----------
 
 function tzOffset(tz, date) {
   const offMin = Math.round(

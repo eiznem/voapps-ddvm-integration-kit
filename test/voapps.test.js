@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const {
   recordsToCsv, campaignName, campaignNamePrefix, localDayBoundary,
   verifyPostbackSignature, createClient, VOAPPS_DAY_OFFSET,
+  localizedIso, VOAPPS_DAY_TZ,
 } = require('../voapps');
 
 // ---- fixed postback HMAC vector (regression-locked) --------------------------
@@ -92,6 +93,11 @@ test('campaignName / campaignNamePrefix format', () => {
   assert.equal(campaignNamePrefix('45+ DPD'), '45+ DPD | Transactional Campaign | ');
   assert.equal(campaignNamePrefix(''), 'Transactional Campaign | ');
   assert.match(campaignName('45+ DPD'), /^45\+ DPD \| Transactional Campaign \| \d{4}-\d{2}-\d{2}T/);
+  // Name timestamp is anchored to VoApps's fixed UTC-07:00 day offset (no DST drift), so
+  // the name's date always matches the VoApps day — winter and summer alike.
+  assert.ok(localizedIso(VOAPPS_DAY_TZ, new Date('2026-01-15T12:00:00Z')).endsWith('-07:00')); // winter
+  assert.ok(localizedIso(VOAPPS_DAY_TZ, new Date('2026-07-15T12:00:00Z')).endsWith('-07:00')); // summer
+  assert.match(campaignName('45+ DPD'), /-07:00$/);
 });
 
 test('localDayBoundary uses the fixed VoApps UTC-07:00 cutoff (no DST shift in winter)', () => {
