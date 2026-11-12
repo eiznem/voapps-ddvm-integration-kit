@@ -20,7 +20,8 @@ info:
       campaign for the current day, add that day's records to it, then start a fresh one the
       next day.
     - **Campaign names must be unique per account** — reusing one returns
-      `400 {"error":"Name must be unique for this account"}`. Append an ISO-8601 timestamp.
+      `400 {"error":"Name must be unique for this account"}`. Append an ISO-8601 timestamp
+      to the millisecond, generated once per campaign and reused on any retry.
     - **HTTP status is separate from the voicemail delivery result.** HTTP codes report whether
       the *request* was accepted (see below); the *voicemail outcome* comes back on each record
       as `delivery_status` + a numeric `delivery_status_code` (see the DeliveryResultCode enum).
@@ -534,7 +535,7 @@ components:
       type: object
       required: [name]
       properties:
-        name: { type: string, description: Unique per account; append an ISO-8601 timestamp. }
+        name: { type: string, description: Unique per account; append an ISO-8601 timestamp to the millisecond and reuse the same name on a retry. }
         message_id: { type: integer }
         caller_number: { type: string, description: 'The actual phone number to display (e.g. "+18885551212"), NOT a caller-number resource id.' }
         transactional: { type: boolean, description: "`true` for the per-day transactional pattern." }
