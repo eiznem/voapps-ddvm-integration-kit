@@ -446,7 +446,14 @@ components:
       type: apiKey
       in: header
       name: Authorization
-      description: 'Send your API key as `Authorization: Token token=YOUR_API_KEY`. Partners use their partner API key.'
+      description: |
+        The documented authentication format, matching the DirectDrop Voicemail portal, is
+        `Authorization: Token token=YOUR_API_KEY`.
+
+        The API also accepts `Authorization: Bearer YOUR_API_KEY`. Both work, but
+        `Token token=` is the format used throughout VoApps's official examples.
+
+        Partners use their partner API key.
   parameters:
     AccountId: { name: account_id, in: path, required: true, schema: { type: integer }, description: VoApps account id. }
     MessageId: { name: message_id, in: path, required: true, schema: { type: integer } }

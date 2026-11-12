@@ -5,7 +5,7 @@ Orientation for an AI coding assistant building a **VoApps DirectDrop Voicemail 
 ## Authentication
 - Authenticate with your account's **VoApps API key** (from the DirectDrop Voicemail portal; see the API Access Guide → *Accessing your API key*). Keep it secret — never commit it, log it, or ship it in a client app.
 - Integration **partners** manage client accounts with a **partner API key** via the Partner API; a client's `account_id` scopes each request.
-- Pass the key exactly as the API Access Guide / Postman collection show for each request; don't invent a header.
+- Send the key in the **`Authorization`** header, exactly as the API Access Guide and Postman collection show: `Authorization: Token token=YOUR_API_KEY`. The API also accepts `Authorization: Bearer YOUR_API_KEY`, but `Token token=` is the documented format used throughout VoApps's official examples — prefer it. Don't invent another header.
 
 ## Campaigns & reuse (the #1 thing to get right)
 - **Transactional campaigns are per-day and expire at the end of the day.** A transactional campaign covers a single day's outreach and is **closed/expired at the end of that day** — VoApps cuts days at **midnight UTC-07:00**. Create (or find) **one** transactional campaign for the current day, add that day's records to it, and start a **fresh** campaign the next day. Do **not** reuse yesterday's campaign, and do **not** carry records over — once the day ends, that campaign is done.
