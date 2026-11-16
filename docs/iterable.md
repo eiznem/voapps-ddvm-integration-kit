@@ -1,8 +1,8 @@
-# Send DirectDrop Voicemail from Iterable (no Zapier)
+# Send DirectDrop Voicemail from Iterable
 
 Trigger VoApps DirectDrop Voicemail (DDVM) from an Iterable journey, using
-Iterable's own **Journey Webhook** to call the VoApps API directly. No Zapier, no
-middleware, and nothing to host. Everything is configured inside Iterable and
+Iterable's own **Journey Webhook** to call the VoApps API directly. No requirement for Zapier or
+any middleware, and nothing to host. Everything is configured inside Iterable and
 VoApps.
 
 Prefer to integrate in your own code? See the
