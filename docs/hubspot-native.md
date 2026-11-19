@@ -37,20 +37,22 @@ timeouts, rate limits, new-campaign creation after the discovery fix, and
 operational recovery. Interactive account/message/caller selection and automatic
 saving of replacement campaign IDs are not implemented.
 
-> **Source code.** The three Custom code actions (Send Voicemail, Result Parser,
-> and Log DDVM) are versioned separately from this guide. Repository samples keep
-> safe defaults (`DRY_RUN = true`, `TEST_MODE = true`), so a sample may differ from
-> the settings of an installed, tested action. Reconcile the two before copying or
-> releasing code; don't assume a sample matches a deployed action.
+> **Source code.** The action code is in [`hubspot/`](../hubspot/) (see
+> [Source files](#source-files)). It was reconstructed from the tested revisions,
+> not freshly exported from the deployed workflows, and hasn't been re-run since
+> it was packaged. It ships with safe defaults (`DRY_RUN = true` in the sender and
+> logger, `TEST_MODE = true` in the logger) and placeholder IDs, so copying it
+> changes nothing until you configure it. The installed test versions had writes
+> enabled. Nothing here updates a live workflow.
 
 ## 1. Prepare access and HubSpot settings
 
 ### Access
 
-You need access to Custom code workflow actions, the **Webhook event is
-received** trigger, call properties with unique values, and calling
-configuration. These were available in the test portal; check your own portal
-rather than relying on a specific HubSpot product tier.
+Running code in workflows (the **Custom code** action) requires **HubSpot Data
+Hub** (formerly Operations Hub). You also need the **Webhook event is received**
+trigger, call properties with unique values, and calling configuration. These
+were available in the test portal; confirm them in yours.
 
 The tested runtime is **Node.js 24.x**, with `exports.main` returning
 `{ outputFields: { ... } }`. Don't mix in callback-style examples from older
@@ -90,7 +92,9 @@ service-key controls available in your account.
    Don't include numeric codes or a "DDVM" prefix, and don't create outcomes for
    Pending or Running.
 
-A read-only setup helper retrieves the outcome IDs; it does **not** create
+A read-only setup helper
+([`setup-outcomes.js`](../hubspot/test-helpers/setup-outcomes.js)) retrieves the
+outcome IDs; it does **not** create
 outcomes or the call type (no supported creation endpoint was found). The logger
 resolves the exact labels at runtime and stops if a label is missing or
 ambiguous.
@@ -171,8 +175,9 @@ that real occurrences populate them before a broad rollout.
 
 ### Action 1: Result Parser
 
-Add a **Custom code** action named **Result Parser**, using the parser source. It
-needs no secret.
+Add a **Custom code** action named **Result Parser** and paste
+[`hubspot/result-parser.js`](../hubspot/result-parser.js). It needs no secret and
+no configuration.
 
 Map these inputs from **VoApps Delivery Result (trigger)**, not from Contact
 properties:
@@ -200,8 +205,9 @@ account settings control whether timestamps are in UTC or the account timezone.
 
 ### Action 2: Log DDVM
 
-Add a second Custom code action named **Log DDVM**, with the
-`HUBSPOT_DDVM_TOKEN` secret. Start with `DRY_RUN = true` and `TEST_MODE = true`.
+Add a second Custom code action named **Log DDVM**, paste
+[`hubspot/log-ddvm.js`](../hubspot/log-ddvm.js), attach the `HUBSPOT_DDVM_TOKEN`
+secret, and set `ACCOUNT_ID`. Start with `DRY_RUN = true` and `TEST_MODE = true`.
 
 | Input | Source |
 |---|---|
@@ -267,10 +273,12 @@ conflicting terminal outcome never silently overwrites an earlier one.
 
 1. Create **DDVM HubSpot Integration Send Voicemail** in the new workflow builder.
 2. Start with **Run on demand → Inputs for each run → CRM Records → Contact**.
-3. Add a Custom code action named **Send Voicemail**, using the sender source and
-   both secrets.
-4. Configure the account, message, caller number, campaign label, the receiver's
-   postback URL, and the saved campaign selection for this use case. Don't reuse
+3. Add a Custom code action named **Send Voicemail**, paste
+   [`hubspot/send-voicemail.js`](../hubspot/send-voicemail.js), and attach both
+   secrets.
+4. Set `ACCOUNT_ID`, `MESSAGE_ID`, `CALLER_NUMBER`, `POSTBACK_URL` (the receiver's
+   webhook URL), `DEFAULT_CAMPAIGN_LABEL`, and `SAVED_CAMPAIGN` for this use case.
+   Leave `SAVED_CAMPAIGN.id` blank until a campaign has been selected. Don't reuse
    another portal's IDs.
 5. Keep `DRY_RUN = true` while previewing.
 
@@ -394,7 +402,8 @@ do any of these as a retry workaround.
    explicit UTC, a numeric offset, and a malformed value (must fail).
 3. **Logger preview:** test codes `200`, `402`, and `408` to cover Completed,
    Canceled, and Failed. Confirm the contact, owner, message, and duration.
-4. **Synthetic reservation:** use the separate helper to create a clearly marked
+4. **Synthetic reservation:** use
+   [`reservation-helper.js`](../hubspot/test-helpers/reservation-helper.js) to create a clearly marked
    test reservation. Preview, update it, then repeat the update. Expect the same
    call ID and `already_logged`.
 5. **Sender dry run:** run the whole draft workflow, not just the action. Confirm
@@ -414,7 +423,7 @@ mapped contact values. If the chosen phone number is unexpected, inspect the
 action's actual runtime inputs.
 
 Don't submit voicemails repeatedly to debug the receiver. A test-only replay
-action can post a captured or synthetic result directly to the HubSpot receiver.
+action ([`replay-webhook.js`](../hubspot/test-helpers/replay-webhook.js)) can post a captured or synthetic result directly to the HubSpot receiver.
 It sends no voicemail, but it can create or update a real test call while the
 receiver is live. Use that action's own **Test** button rather than running a
 helper workflow that contains other write actions.
@@ -426,7 +435,7 @@ the receiver doesn't replay earlier events.
 
 ### Release checklist
 
-- [ ] Reconcile the source samples with the installed, tested action versions.
+- [ ] Confirm the code you install matches the tested revisions in `hubspot/`.
 - [ ] Remove stale diagnostic comments and preview interlocks only as part of an
       approved release.
 - [ ] Keep safe defaults in samples, and document each deployment flag.
@@ -436,11 +445,12 @@ the receiver doesn't replay earlier events.
 - [ ] Confirm reservation updates and repeated-send/postback behavior.
 - [ ] Review simultaneous-send, timeout, rate-limit, and later-result-correction
       scenarios.
-- [ ] Decide on postback authenticity. **HMAC signature verification is not
-      implemented in this native receiver**, and a contact-association match is
-      not authentication. If your organization requires signed postbacks, verify
-      them in your own receiver (see `verify_postback.py` and
-      `postback_server.example.js` in this kit) instead.
+- [ ] Decide on postback authenticity. **HMAC postback signing is not
+      implemented or tested with this native receiver**, and a
+      contact-association match is not authentication. If your organization
+      requires signed postbacks, use a receiver that verifies signatures (the
+      kit's `verify_postback.py` and `postback_server.example.js` show how), and
+      test it before relying on it.
 - [ ] Assign monitoring and a reconciliation owner for queued reservations and
       review-required results.
 - [ ] Approve the production audience, consent and suppression policy, delivery
@@ -499,6 +509,30 @@ labels the activity but doesn't create a separate deduplication namespace, so a
 test reservation can block a later send to the same contact in the same campaign.
 For a genuinely new send, use an intentionally new, approved campaign; never edit
 the reference keys.
+
+## Source files
+
+Paste each file into the Custom code action with the same name. Every file runs
+on Node.js 24.x.
+
+| File | Action | Secrets | Configure |
+|---|---|---|---|
+| [`hubspot/send-voicemail.js`](../hubspot/send-voicemail.js) | Send Voicemail | `VOAPPS_API_KEY`, `HUBSPOT_DDVM_TOKEN` | `ACCOUNT_ID`, `MESSAGE_ID`, `CALLER_NUMBER`, `POSTBACK_URL`, `DEFAULT_CAMPAIGN_LABEL`, `SAVED_CAMPAIGN`, `DRY_RUN` |
+| [`hubspot/result-parser.js`](../hubspot/result-parser.js) | Result Parser | none | none |
+| [`hubspot/log-ddvm.js`](../hubspot/log-ddvm.js) | Log DDVM | `HUBSPOT_DDVM_TOKEN` | `ACCOUNT_ID`, `DRY_RUN`, `TEST_MODE` |
+
+Test-only helpers live in [`hubspot/test-helpers/`](../hubspot/test-helpers/).
+None of them is needed for routine operation:
+
+| File | What it does |
+|---|---|
+| [`setup-outcomes.js`](../hubspot/test-helpers/setup-outcomes.js) | Read-only: lists call outcomes and checks that every result label resolves. |
+| [`reservation-helper.js`](../hubspot/test-helpers/reservation-helper.js) | Creates one `[TEST]` queued call for the test contact under a synthetic campaign ID. Never calls VoApps. |
+| [`replay-webhook.js`](../hubspot/test-helpers/replay-webhook.js) | Posts a synthetic Duplicate number result to your receiver URL. Sends no voicemail, but a live receiver can write a test call. |
+
+The placeholders (`YOUR_ACCOUNT_ID`, `YOUR_HUBSPOT_WEBHOOK_URL`, and so on) make
+each action stop before writing anything until you replace them. Never commit
+your receiver URL, IDs, or keys.
 
 ## Passthrough fields
 

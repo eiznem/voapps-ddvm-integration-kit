@@ -20,7 +20,7 @@ Contact VoApps for access.
 
 Connect your CRM or marketing platform:
 
-- **HubSpot:** [via Zapier](docs/zapier-hubspot.md) (no code; private Zapier integration, by invite: support@voapps.com), or [native via HubSpot Workflows](docs/hubspot-native.md) (Custom code actions plus a webhook-event trigger that logs each result as a call, no Zapier and nothing to host).
+- **HubSpot:** [via Zapier](docs/zapier-hubspot.md) (no code; private Zapier integration, by invite: support@voapps.com), or [native via HubSpot Workflows](docs/hubspot-native.md) (requires HubSpot Data Hub for Custom code; a webhook-event trigger logs each result as a call; no Zapier and nothing to host).
 - **Iterable:** [native via journey webhooks](docs/iterable.md) (no code, no Zapier).
 
 Everything below is the developer path (direct API).
