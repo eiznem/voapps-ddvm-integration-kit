@@ -50,7 +50,7 @@ saving of replacement campaign IDs are not implemented.
 ### Access
 
 Running code in workflows (the **Custom code** action) requires **HubSpot Data
-Hub** (formerly Operations Hub). You also need the **Webhook event is received**
+Hub Professional or Enterprise** (formerly Operations Hub). You also need the **Webhook event is received**
 trigger, call properties with unique values, and calling configuration. These
 were available in the test portal; confirm them in yours.
 
